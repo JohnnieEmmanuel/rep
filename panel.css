@@ -179,6 +179,16 @@ body {
     /* Brighter text for starred items */
 }
 
+.req-time {
+    font-size: 10px;
+    color: #5f6368;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(95, 99, 104, 0.1);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
 .item-actions {
     display: flex;
     gap: 4px;

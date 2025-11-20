@@ -76,9 +76,22 @@ function setupNetworkListener() {
             return;
         }
 
+        // Store the capture time for relative time display
+        request.capturedAt = Date.now();
+        
         requests.push(request);
         renderRequestItem(request, requests.length - 1);
     });
+}
+
+function formatTime(capturedAt) {
+    if (!capturedAt) return '';
+    
+    const date = new Date(capturedAt);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
 }
 
 function renderRequestItem(request, index) {
@@ -103,6 +116,15 @@ function renderRequestItem(request, index) {
     }
     urlSpan.title = request.request.url;
 
+    // Time span
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'req-time';
+    timeSpan.textContent = formatTime(request.capturedAt);
+    if (request.capturedAt) {
+        const date = new Date(request.capturedAt);
+        timeSpan.title = date.toLocaleTimeString();
+    }
+
     // Actions container
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'item-actions';
@@ -122,6 +144,7 @@ function renderRequestItem(request, index) {
 
     item.appendChild(methodSpan);
     item.appendChild(urlSpan);
+    item.appendChild(timeSpan);
     item.appendChild(actionsDiv);
 
     item.addEventListener('click', () => selectRequest(index));
