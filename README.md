@@ -17,6 +17,7 @@ rep+ is a lightweight Chrome DevTools extension inspired by Burp Suite's Repeate
 - **Screenshots**: Built-in screenshot tool to capture the request/response pair for bug reports.
 - **History & Navigation**: Undo/redo support for edits and history navigation for selected requests.
 - **Starring**: Pin important requests to keep them at the top of your list.
+- **Clear Workspace**: Instantly clear all captured requests with a single click to start a fresh session.
 
 ## Installation
 

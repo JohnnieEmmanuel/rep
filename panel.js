@@ -797,6 +797,14 @@ function setupEventListeners() {
         });
     });
 
+    // Clear All Button
+    const clearAllBtn = document.getElementById('clear-all-btn');
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', () => {
+            clearAllRequests();
+        });
+    }
+
     // History Navigation
     historyBackBtn.addEventListener('click', () => {
         if (historyIndex > 0) {
@@ -1745,4 +1753,31 @@ function setupSidebarResize() {
             document.body.style.userSelect = '';
         }
     });
+}
+
+function clearAllRequests() {
+    // Clear state
+    requests = [];
+    selectedRequest = null;
+
+    // Clear DOM
+    requestList.innerHTML = '';
+
+    // Add empty state message
+    const emptyState = document.createElement('div');
+    emptyState.className = 'empty-state';
+    emptyState.textContent = 'Listening for requests...';
+    requestList.appendChild(emptyState);
+
+    // Clear Editor
+    rawRequestInput.textContent = '';
+    rawResponseDisplay.textContent = '';
+    resStatus.textContent = '';
+    resStatus.className = 'status-badge';
+    resTime.textContent = '';
+
+    // Reset History
+    requestHistory = [];
+    historyIndex = -1;
+    updateHistoryButtons();
 }
