@@ -33,6 +33,10 @@ rep+ is a lightweight Chrome DevTools extension inspired by Burp Suite's Repeate
 
 [![Watch Demo](https://img.shields.io/badge/Demo-Video-red?style=for-the-badge&logo=youtube)](https://video.twimg.com/amplify_video/1992382891196571648/pl/zE5-oOXgVua1ZBQn.m3u8?tag=14)
 
+## 🚀 Install rep+ Chrome Extension  
+[![rep+](https://img.shields.io/badge/rep%2B%20Chrome%20Extension-Install%20Now-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/rep+/dhildnnjbegaggknfkagdpnballiepfm)
+
+
 ## Table of Contents
 - [Features](#features)
 - [Quick Start](#quick-start)
