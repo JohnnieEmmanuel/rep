@@ -720,10 +720,10 @@ export async function captureScreenshot() {
     // Capture only the full request and response content (no headers/search bars),
     // and make sure the entire text is visible in the image.
     try {
-        if (typeof html2canvas === 'undefined') {
-            alert('html2canvas library not loaded');
-            return;
-        }
+    if (typeof html2canvas === 'undefined') {
+        alert('html2canvas library not loaded');
+        return;
+    }
 
         const requestEditor = document.querySelector('#raw-request-input');
         const responseActiveView = document.querySelector('.response-pane .view-content.active');
@@ -745,9 +745,17 @@ export async function captureScreenshot() {
         wrapper.style.background = getComputedStyle(document.body).backgroundColor || '#1e1e1e';
         wrapper.style.padding = '16px';
         wrapper.style.display = 'flex';
-        wrapper.style.flexDirection = 'row'; // side by side
+        // Match the current layout (horizontal vs vertical) of the main split view
+        const splitView = document.querySelector('.split-view-container');
+        const isVerticalLayout = splitView && splitView.classList.contains('vertical-layout');
+        wrapper.style.flexDirection = isVerticalLayout ? 'column' : 'row';
         wrapper.style.gap = '16px';
         wrapper.style.fontFamily = getComputedStyle(document.body).fontFamily || 'monospace';
+        // Constrain the logical width so long tokens can't create a giant canvas
+        const maxWrapperWidth = Math.min(window.innerWidth - 80, 1400);
+        if (Number.isFinite(maxWrapperWidth) && maxWrapperWidth > 0) {
+            wrapper.style.width = `${maxWrapperWidth}px`;
+        }
 
         // Helper to clone a node (keeping syntax highlighting / colors) into a section
         const makeSection = (title, sourceNode) => {
@@ -779,12 +787,12 @@ export async function captureScreenshot() {
             clone.style.overflow = 'visible';
             clone.style.width = '100%';
 
-            // Explicitly preserve multi-line layout and font from the original,
-            // even after we remove the id (so id-based CSS no longer applies).
+            // Explicitly enforce a wrapped, readable layout for the screenshot,
+            // so long tokens (e.g. JWTs) don't make the canvas extremely wide.
             const srcStyles = getComputedStyle(sourceNode);
-            clone.style.whiteSpace = srcStyles.whiteSpace || 'pre-wrap';
-            clone.style.wordBreak = srcStyles.wordBreak || 'break-all';
-            clone.style.overflowWrap = srcStyles.overflowWrap || 'break-word';
+            clone.style.whiteSpace = 'pre-wrap';
+            clone.style.wordBreak = 'break-word';
+            clone.style.overflowWrap = 'break-word';
             clone.style.fontFamily = srcStyles.fontFamily || 'Consolas, Monaco, monospace';
             clone.style.fontSize = srcStyles.fontSize || '13px';
             clone.style.lineHeight = srcStyles.lineHeight || '1.5';
@@ -801,7 +809,7 @@ export async function captureScreenshot() {
         wrapper.appendChild(resSection);
         document.body.appendChild(wrapper);
 
-        // Let layout settle
+        // Let layout settle and render to a canvas
         const canvas = await html2canvas(wrapper, {
             backgroundColor: wrapper.style.background,
             scrollX: 0,
@@ -810,6 +818,317 @@ export async function captureScreenshot() {
 
         document.body.removeChild(wrapper);
 
+        // Open the annotation editor so user can highlight/redact before exporting
+        openScreenshotEditor(canvas);
+    } catch (error) {
+        console.error('Screenshot capture failed:', error);
+        alert(`Screenshot failed: ${error.message}`);
+    }
+}
+
+function openScreenshotEditor(imageCanvas) {
+    const modal = document.getElementById('screenshot-editor-modal');
+    const canvas = document.getElementById('screenshot-editor-canvas');
+    const highlightBtn = document.getElementById('screenshot-tool-highlight');
+    const redactBtn = document.getElementById('screenshot-tool-redact');
+    const undoBtn = document.getElementById('screenshot-tool-undo');
+    const redoBtn = document.getElementById('screenshot-tool-redo');
+    const downloadBtn = document.getElementById('screenshot-download-btn');
+    const closeBtn = document.getElementById('screenshot-editor-close');
+    const zoomInBtn = document.getElementById('screenshot-zoom-in');
+    const zoomOutBtn = document.getElementById('screenshot-zoom-out');
+    const zoomValueEl = document.getElementById('screenshot-zoom-value');
+
+    if (!modal || !canvas || !highlightBtn || !redactBtn || !undoBtn || !downloadBtn || !closeBtn) {
+        console.warn('Screenshot editor elements missing');
+        // Fallback: just download the raw screenshot
+        imageCanvas.toBlob((blob) => {
+            if (!blob) {
+                alert('Failed to generate screenshot image.');
+                return;
+            }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            a.download = `rep-request-response-${timestamp}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 'image/png');
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+        alert('Canvas context not available.');
+        return;
+    }
+
+    // Resize canvas to match the captured image (internal resolution)
+    canvas.width = imageCanvas.width;
+    canvas.height = imageCanvas.height;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(imageCanvas, 0, 0);
+
+    // Annotation state
+    let currentTool = 'highlight'; // 'highlight' | 'redact'
+    let isDragging = false;
+    let dragMode = null; // 'draw' | 'move' | 'resize'
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let lastX = 0;
+    let lastY = 0;
+    let currentDraftShape = null;
+    let selectedShape = null;
+    let activeHandle = null; // which corner/edge is being resized
+
+    // Shapes are stored as logical rectangles over the base image
+    const shapes = [];
+    const undoStack = [];
+    const redoStack = [];
+
+    let currentZoom = 1;
+
+    const cloneShape = (shape) => ({
+        type: shape.type,
+        x: shape.x,
+        y: shape.y,
+        w: shape.w,
+        h: shape.h,
+    });
+
+    const pushUndoSnapshot = () => {
+        try {
+            undoStack.push(shapes.map(cloneShape));
+            // New action invalidates redo history
+            redoStack.length = 0;
+        } catch (e) {
+            console.warn('Unable to save state for undo', e);
+        }
+    };
+
+    // Seed undo stack with empty shapes list
+    pushUndoSnapshot();
+
+    const setActiveTool = (tool) => {
+        currentTool = tool;
+        highlightBtn.classList.toggle('active', tool === 'highlight');
+        redactBtn.classList.toggle('active', tool === 'redact');
+    };
+
+    const applyZoom = (zoom) => {
+        currentZoom = Math.max(0.5, Math.min(3, zoom));
+        canvas.style.transform = `scale(${currentZoom})`;
+        canvas.style.transformOrigin = 'top left';
+        if (zoomValueEl) {
+            zoomValueEl.textContent = `${Math.round(currentZoom * 100)}%`;
+        }
+    };
+
+    const drawShape = (shape, opts = {}) => {
+        const { isDraft = false, isSelected = false } = opts;
+        const x = shape.x;
+        const y = shape.y;
+        const w = shape.w;
+        const h = shape.h;
+
+        if (shape.type === 'highlight') {
+            ctx.fillStyle = 'rgba(255, 255, 0, 0.35)';
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+        } else if (shape.type === 'redact') {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(x, y, w, h);
+        }
+
+        // Selection outline and resize handles
+        if (isSelected && !isDraft) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(138, 180, 248, 0.9)';
+            ctx.setLineDash([4, 2]);
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+            ctx.setLineDash([]);
+
+            const handleSize = 6;
+            const half = handleSize / 2;
+            const points = [
+                [x, y],                 // tl
+                [x + w / 2, y],         // t
+                [x + w, y],             // tr
+                [x + w, y + h / 2],     // r
+                [x + w, y + h],         // br
+                [x + w / 2, y + h],     // b
+                [x, y + h],             // bl
+                [x, y + h / 2],         // l
+            ];
+            ctx.fillStyle = 'rgba(138, 180, 248, 1)';
+            points.forEach(([px, py]) => {
+                ctx.fillRect(px - half, py - half, handleSize, handleSize);
+            });
+            ctx.restore();
+        }
+    };
+
+    const renderAll = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(imageCanvas, 0, 0);
+
+        shapes.forEach((shape) => {
+            const isSel = selectedShape && shape === selectedShape;
+            drawShape(shape, { isSelected: isSel });
+        });
+
+        if (currentDraftShape) {
+            drawShape(currentDraftShape, { isDraft: true });
+        }
+    };
+
+    const getHandleAtPoint = (shape, x, y) => {
+        const handleSize = 8;
+        const half = handleSize / 2;
+        const { x: sx, y: sy, w, h } = shape;
+        const points = [
+            { key: 'tl', x: sx, y: sy },
+            { key: 't', x: sx + w / 2, y: sy },
+            { key: 'tr', x: sx + w, y: sy },
+            { key: 'r', x: sx + w, y: sy + h / 2 },
+            { key: 'br', x: sx + w, y: sy + h },
+            { key: 'b', x: sx + w / 2, y: sy + h },
+            { key: 'bl', x: sx, y: sy + h },
+            { key: 'l', x: sx, y: sy + h / 2 },
+        ];
+        for (const p of points) {
+            if (Math.abs(x - p.x) <= half && Math.abs(y - p.y) <= half) {
+                return p.key;
+            }
+        }
+        return null;
+    };
+
+    const normalizeRect = (shape) => {
+        let { x, y, w, h } = shape;
+        if (w < 0) {
+            x = x + w;
+            w = -w;
+        }
+        if (h < 0) {
+            y = y + h;
+            h = -h;
+        }
+        return { ...shape, x, y, w, h };
+    };
+
+    const hitTestShape = (x, y) => {
+        // Iterate from topmost shape
+        for (let i = shapes.length - 1; i >= 0; i--) {
+            const s = shapes[i];
+            if (
+                x >= s.x &&
+                x <= s.x + s.w &&
+                y >= s.y &&
+                y <= s.y + s.h
+            ) {
+                return s;
+            }
+        }
+        return null;
+    };
+
+    // Assign handlers (overwrite any previous ones)
+    highlightBtn.onclick = () => setActiveTool('highlight');
+    redactBtn.onclick = () => setActiveTool('redact');
+
+    if (zoomInBtn) {
+        zoomInBtn.onclick = () => applyZoom(currentZoom + 0.25);
+    }
+    if (zoomOutBtn) {
+        zoomOutBtn.onclick = () => applyZoom(currentZoom - 0.25);
+    }
+
+    undoBtn.onclick = () => {
+        if (undoStack.length > 1) {
+            const current = undoStack.pop();
+            // Save current state to redo stack
+            try {
+                redoStack.push(current);
+            } catch (e) {
+                console.warn('Unable to save state for redo', e);
+            }
+            const last = undoStack[undoStack.length - 1];
+            shapes.length = 0;
+            last.forEach((s) => shapes.push(cloneShape(s)));
+            selectedShape = null;
+            renderAll();
+        }
+    };
+
+    if (redoBtn) {
+        redoBtn.onclick = () => {
+            if (redoStack.length > 0) {
+                const state = redoStack.pop();
+                if (state) {
+                    try {
+                        undoStack.push(state);
+                    } catch (e) {
+                        console.warn('Unable to save state for undo during redo', e);
+                    }
+                    shapes.length = 0;
+                    state.forEach((s) => shapes.push(cloneShape(s)));
+                    selectedShape = null;
+                    renderAll();
+                }
+            }
+        };
+    }
+
+    // Keyboard handler for deleting selected annotation with Delete / Backspace
+    const onKeyDown = (event) => {
+        if (!selectedShape) return;
+        if (event.key === 'Delete' || event.key === 'Backspace') {
+            event.preventDefault();
+            const idx = shapes.indexOf(selectedShape);
+            if (idx !== -1) {
+                shapes.splice(idx, 1);
+                selectedShape = null;
+                pushUndoSnapshot();
+                renderAll();
+            }
+        }
+    };
+
+    const closeModal = () => {
+        modal.style.display = 'none';
+        // Clean up handlers so they don't leak references
+        canvas.onmousedown = null;
+        canvas.onmousemove = null;
+        canvas.onmouseup = null;
+        canvas.onmouseleave = null;
+        highlightBtn.onclick = null;
+        redactBtn.onclick = null;
+        undoBtn.onclick = null;
+        if (redoBtn) redoBtn.onclick = null;
+        downloadBtn.onclick = null;
+        closeBtn.onclick = null;
+        if (zoomInBtn) zoomInBtn.onclick = null;
+        if (zoomOutBtn) zoomOutBtn.onclick = null;
+        document.removeEventListener('keydown', onKeyDown);
+    };
+
+    closeBtn.onclick = closeModal;
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    };
+
+    downloadBtn.onclick = () => {
+        // Ensure we render the latest shapes into the canvas before export
+        renderAll();
         canvas.toBlob((blob) => {
             if (!blob) {
                 alert('Failed to generate screenshot image.');
@@ -825,10 +1144,135 @@ export async function captureScreenshot() {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 'image/png');
-    } catch (error) {
-        console.error('Screenshot capture failed:', error);
-        alert(`Screenshot failed: ${error.message}`);
-    }
+        closeModal();
+    };
+
+    const getCanvasCoords = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        return {
+            x: (event.clientX - rect.left) * scaleX,
+            y: (event.clientY - rect.top) * scaleY
+        };
+    };
+
+    const onMouseDown = (event) => {
+        const { x, y } = getCanvasCoords(event);
+        dragStartX = x;
+        dragStartY = y;
+        lastX = x;
+        lastY = y;
+        isDragging = true;
+        activeHandle = null;
+        currentDraftShape = null;
+
+        const hitShape = hitTestShape(x, y);
+        if (hitShape) {
+            selectedShape = hitShape;
+            // Check if near a resize handle
+            const handle = getHandleAtPoint(hitShape, x, y);
+            if (handle) {
+                dragMode = 'resize';
+                activeHandle = handle;
+            } else {
+                dragMode = 'move';
+            }
+        } else {
+            // Start drawing a new shape
+            dragMode = 'draw';
+            const shape = {
+                type: currentTool,
+                x,
+                y,
+                w: 0,
+                h: 0,
+            };
+            currentDraftShape = shape;
+            selectedShape = null;
+        }
+
+        renderAll();
+    };
+
+    const onMouseMove = (event) => {
+        if (!isDragging) return;
+        const { x, y } = getCanvasCoords(event);
+        const dx = x - lastX;
+        const dy = y - lastY;
+        lastX = x;
+        lastY = y;
+
+        if (dragMode === 'draw' && currentDraftShape) {
+            currentDraftShape.w = x - dragStartX;
+            currentDraftShape.h = y - dragStartY;
+        } else if (dragMode === 'move' && selectedShape) {
+            selectedShape.x += dx;
+            selectedShape.y += dy;
+        } else if (dragMode === 'resize' && selectedShape && activeHandle) {
+            const s = selectedShape;
+            const right = s.x + s.w;
+            const bottom = s.y + s.h;
+            let newX = s.x;
+            let newY = s.y;
+            let newRight = right;
+            let newBottom = bottom;
+
+            if (activeHandle.includes('l')) {
+                newX = x;
+            }
+            if (activeHandle.includes('r')) {
+                newRight = x;
+            }
+            if (activeHandle.includes('t')) {
+                newY = y;
+            }
+            if (activeHandle.includes('b')) {
+                newBottom = y;
+            }
+
+            s.x = Math.min(newX, newRight);
+            s.y = Math.min(newY, newBottom);
+            s.w = Math.abs(newRight - newX);
+            s.h = Math.abs(newBottom - newY);
+        }
+
+        renderAll();
+    };
+
+    const onMouseUp = () => {
+        if (!isDragging) return;
+        isDragging = false;
+
+        if (dragMode === 'draw' && currentDraftShape) {
+            const normalized = normalizeRect(currentDraftShape);
+            // Ignore tiny shapes
+            if (normalized.w > 2 && normalized.h > 2) {
+                shapes.push(normalized);
+                selectedShape = shapes[shapes.length - 1];
+                pushUndoSnapshot();
+            }
+            currentDraftShape = null;
+        } else if ((dragMode === 'move' || dragMode === 'resize') && selectedShape) {
+            pushUndoSnapshot();
+        }
+
+        dragMode = null;
+        activeHandle = null;
+        renderAll();
+    };
+
+    canvas.onmousedown = onMouseDown;
+    canvas.onmousemove = onMouseMove;
+    canvas.onmouseup = onMouseUp;
+    canvas.onmouseleave = onMouseUp;
+
+    document.addEventListener('keydown', onKeyDown);
+
+    setActiveTool('highlight');
+    applyZoom(1);
+    renderAll();
+    modal.style.display = 'block';
 }
 
 function getFilteredRequests() {

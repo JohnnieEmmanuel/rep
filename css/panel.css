@@ -814,6 +814,67 @@ body.theme-transitioning img {
     flex-shrink: 0;
 }
 
+/* Screenshot Editor Modal */
+.screenshot-editor-modal {
+    width: 90vw;
+    max-width: 1200px;
+}
+
+.screenshot-editor-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.screenshot-tools {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.screenshot-tools .secondary-btn.active {
+    background: var(--accent-color);
+    color: #000;
+    border-color: var(--accent-color);
+}
+
+.screenshot-zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    font-size: 12px;
+    color: #9aa0a6;
+}
+
+.screenshot-zoom-controls .zoom-label {
+    opacity: 0.8;
+}
+
+.screenshot-zoom-controls .zoom-value {
+    min-width: 48px;
+    text-align: center;
+}
+
+.screenshot-canvas-wrapper {
+    flex: 1;
+    max-height: 70vh;
+    overflow: auto;
+    background: #000;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+}
+
+#screenshot-editor-canvas {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
 .form-group {
     margin-bottom: 15px;
 }
