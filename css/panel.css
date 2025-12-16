@@ -22,6 +22,8 @@ body {
     color: var(--text-color);
     height: 100vh;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
     
     /* Smooth theme transition */
     transition: background-color var(--theme-transition-duration) var(--theme-transition-timing),
@@ -101,7 +103,8 @@ body.theme-transitioning img {
 
 .container {
     display: flex;
-    height: 100%;
+    flex: 1;
+    min-height: 0; /* allow children to flex/scroll within remaining space */
 }
 
 /* Sidebar */
@@ -2594,6 +2597,25 @@ pre {
 
 .view-content.active {
     display: flex !important;
+}
+
+/* Preview view specific styles */
+#res-view-preview {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: white;
+}
+
+.preview-controls {
+    flex-shrink: 0;
+    background: var(--sidebar-bg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+#response-preview-iframe {
+    flex: 1;
+    min-height: 0;
 }
 
 /* Raw Editor */
