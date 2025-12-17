@@ -223,31 +223,83 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Method filter dropdown
+    // Method filter dropdown (multi-select)
     const methodFilterBtn = document.getElementById('method-filter-btn');
     const methodFilterLabel = document.getElementById('method-filter-label');
     const methodFilterMenu = document.getElementById('method-filter-menu');
+    const methodCheckboxes = methodFilterMenu ? Array.from(methodFilterMenu.querySelectorAll('.method-checkbox')) : [];
     const methodItems = methodFilterMenu ? Array.from(methodFilterMenu.querySelectorAll('.method-filter-item')) : [];
+    const selectAllBtn = document.getElementById('method-select-all');
+    const clearAllBtn = document.getElementById('method-clear-all');
     const starFilterBtn = document.querySelector('.filter-btn[data-filter="starred"]');
 
-    const setMethodFilter = (value) => {
-        const normalized = value === 'all' ? 'all' : (value || 'all').toUpperCase();
-        state.currentFilter = normalized;
-        if (methodItems) {
-            methodItems.forEach(item => item.classList.toggle('active', item.dataset.filter === normalized));
-        }
+    const ALL_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', 'TRACE', 'XHR'];
+
+    const updateMethodFilterUI = () => {
+        // Update checkboxes
+        methodCheckboxes.forEach(checkbox => {
+            const method = checkbox.dataset.filter;
+            checkbox.checked = state.selectedMethods.has(method);
+        });
+
+        // Update item active state
+        methodItems.forEach(item => {
+            const method = item.dataset.filter;
+            item.classList.toggle('active', state.selectedMethods.has(method));
+        });
+
+        // Update label
         if (methodFilterLabel) {
-            methodFilterLabel.textContent = normalized === 'all' ? 'All' : normalized;
+            if (state.selectedMethods.size === 0) {
+                methodFilterLabel.textContent = 'All';
+            } else if (state.selectedMethods.size === ALL_METHODS.length) {
+                methodFilterLabel.textContent = 'All';
+            } else if (state.selectedMethods.size <= 3) {
+                methodFilterLabel.textContent = Array.from(state.selectedMethods).join(', ');
+            } else {
+                methodFilterLabel.textContent = `${state.selectedMethods.size} methods`;
+            }
         }
-        // Visual cue on the pill when filter is not "All"
+
+        // Visual cue on the pill when filter is active
         if (methodFilterBtn) {
-            methodFilterBtn.classList.toggle('active', normalized !== 'all');
+            methodFilterBtn.classList.toggle('active', state.selectedMethods.size > 0 && state.selectedMethods.size < ALL_METHODS.length);
         }
-        // Star filter is mutually exclusive with method filter; clear its state
-        if (starFilterBtn) {
-            starFilterBtn.classList.toggle('active', normalized === 'starred');
+
+        // Don't clear star filter - they work together now
+
+        // Update legacy currentFilter for compatibility
+        if (state.selectedMethods.size === 0 || state.selectedMethods.size === ALL_METHODS.length) {
+            state.currentFilter = 'all';
+        } else if (state.selectedMethods.size === 1) {
+            state.currentFilter = Array.from(state.selectedMethods)[0];
+        } else {
+            state.currentFilter = 'multiple';
         }
+
         filterRequests();
+    };
+
+    const toggleMethod = (method) => {
+        if (state.selectedMethods.has(method)) {
+            state.selectedMethods.delete(method);
+        } else {
+            state.selectedMethods.add(method);
+        }
+        // Don't clear star filter - they work together now
+        updateMethodFilterUI();
+    };
+
+    const selectAllMethods = () => {
+        ALL_METHODS.forEach(method => state.selectedMethods.add(method));
+        // Don't clear star filter - they work together now
+        updateMethodFilterUI();
+    };
+
+    const clearAllMethods = () => {
+        state.selectedMethods.clear();
+        // Don't clear star filter - they work together now
+        updateMethodFilterUI();
     };
 
     if (methodFilterBtn && methodFilterMenu) {
@@ -256,42 +308,73 @@ document.addEventListener('DOMContentLoaded', () => {
             methodFilterMenu.classList.toggle('open');
         });
 
-        methodItems.forEach(item => {
-            item.addEventListener('click', (e) => {
+        // Handle checkbox clicks
+        methodCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
                 e.stopPropagation();
-                const val = item.dataset.filter || 'all';
-                setMethodFilter(val);
-                methodFilterMenu.classList.remove('open');
+                const method = checkbox.dataset.filter;
+                toggleMethod(method);
             });
         });
+
+        // Handle item clicks (clicking anywhere on the item toggles the checkbox)
+        methodItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                // Don't toggle if clicking directly on the checkbox (it handles its own event)
+                if (e.target.type === 'checkbox') return;
+                e.stopPropagation();
+                const checkbox = item.querySelector('.method-checkbox');
+                if (checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    toggleMethod(checkbox.dataset.filter);
+                }
+            });
+        });
+
+        // Select all button
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectAllMethods();
+            });
+        }
+
+        // Clear all button
+        if (clearAllBtn) {
+            clearAllBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                clearAllMethods();
+            });
+        }
 
         document.addEventListener('click', (e) => {
             if (methodFilterMenu.contains(e.target) || methodFilterBtn.contains(e.target)) return;
             methodFilterMenu.classList.remove('open');
         });
 
-        // Initialize label/active state
-        setMethodFilter(state.currentFilter || 'all');
+        // Initialize UI
+        updateMethodFilterUI();
     }
 
-    // Star filter toggle (mutually exclusive with method filter)
+    // Star filter toggle (works together with method and color filters)
     if (starFilterBtn) {
+        // Initialize button state
+        starFilterBtn.classList.toggle('active', state.starFilterActive);
+        
         starFilterBtn.addEventListener('click', () => {
             const currentlyActive = starFilterBtn.classList.contains('active');
             if (currentlyActive) {
-                // Clear star filter -> back to All
+                // Clear star filter
                 starFilterBtn.classList.remove('active');
-                setMethodFilter('all');
+                state.starFilterActive = false;
+                state.currentFilter = 'all';
             } else {
                 // Activate star filter
                 starFilterBtn.classList.add('active');
+                state.starFilterActive = true;
                 if (methodFilterMenu) methodFilterMenu.classList.remove('open');
-                if (methodItems) methodItems.forEach(item => item.classList.remove('active'));
-                if (methodFilterBtn) methodFilterBtn.classList.remove('active');
-                if (methodFilterLabel) methodFilterLabel.textContent = 'All';
-                state.currentFilter = 'starred';
-                filterRequests();
             }
+            filterRequests();
         });
     }
 

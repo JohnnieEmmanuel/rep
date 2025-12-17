@@ -232,16 +232,40 @@ body.theme-transitioning img {
     align-items: center;
     justify-content: center;
     gap: 4px;
+    color: var(--text-color);
+    transition: all 0.2s ease;
 }
 
 .block-toggle-btn .block-icon {
-    opacity: 0.9;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
 }
 
+/* Active state: Blocking mode (red/orange warning) */
 .block-toggle-btn.active {
-    background: rgba(138, 180, 248, 0.12) !important;
+    background: rgba(255, 152, 43, 0.15) !important;
+    border-color: #ff982b !important;
+    color: #ff982b !important;
+}
+
+.block-toggle-btn.active .block-icon {
+    opacity: 1;
+}
+
+/* Hover states */
+.block-toggle-btn:hover:not(.active) {
+    background: var(--hover-bg) !important;
     border-color: var(--accent-color) !important;
     color: var(--accent-color) !important;
+}
+
+.block-toggle-btn:hover:not(.active) .block-icon {
+    opacity: 1;
+}
+
+.block-toggle-btn.active:hover {
+    background: rgba(255, 152, 43, 0.25) !important;
+    border-color: #ff982b !important;
 }
 
 .method-filter {
@@ -281,13 +305,57 @@ body.theme-transitioning img {
     display: block;
 }
 
+.method-filter-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.method-filter-action-btn {
+    padding: 0 8px;
+    font-size: 11px;
+    background: transparent;
+    border: none;
+    color: var(--accent-color);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+    line-height: 1;
+    position: relative;
+}
+
+.method-filter-action-btn:hover {
+    color: var(--text-color);
+    opacity: 0.9;
+}
+
+.method-filter-action-btn:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1px;
+    height: 12px;
+    background: var(--border-color);
+}
+
+.method-filter-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 0;
+}
+
 .method-filter-item {
     padding: 8px 10px;
     cursor: pointer;
     font-size: 12px;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     user-select: none;
 }
 
@@ -297,6 +365,18 @@ body.theme-transitioning img {
 
 .method-filter-item.active {
     color: var(--accent-color);
+}
+
+.method-checkbox {
+    margin: 0;
+    cursor: pointer;
+    width: 14px;
+    height: 14px;
+    accent-color: var(--accent-color);
+}
+
+.method-filter-item span {
+    flex: 1;
 }
 
 .forward-combo {

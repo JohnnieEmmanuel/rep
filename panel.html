@@ -77,17 +77,49 @@
                             <span class="method-caret">▾</span>
                         </button>
                         <div id="method-filter-menu" class="method-filter-menu">
-                            <div class="method-filter-item" data-filter="all">All</div>
-                            <div class="method-filter-item" data-filter="GET">GET</div>
-                            <div class="method-filter-item" data-filter="POST">POST</div>
-                            <div class="method-filter-item" data-filter="PUT">PUT</div>
-                            <div class="method-filter-item" data-filter="DELETE">DELETE</div>
-                            <div class="method-filter-item" data-filter="PATCH">PATCH</div>
-                            <div class="method-filter-item" data-filter="HEAD">HEAD</div>
-                            <div class="method-filter-item" data-filter="OPTIONS">OPTIONS</div>
-                            <div class="method-filter-item" data-filter="TRACE">TRACE</div>
+                            <div class="method-filter-actions">
+                                <button class="method-filter-action-btn" id="method-select-all">Select all</button>
+                                <button class="method-filter-action-btn" id="method-clear-all">Clear all</button>
+                            </div>
+                            <div class="method-filter-divider"></div>
+                            <div class="method-filter-item" data-filter="GET">
+                                <input type="checkbox" class="method-checkbox" data-filter="GET">
+                                <span>GET</span>
+                            </div>
+                            <div class="method-filter-item" data-filter="POST">
+                                <input type="checkbox" class="method-checkbox" data-filter="POST">
+                                <span>POST</span>
+                            </div>
+                            <div class="method-filter-item" data-filter="PUT">
+                                <input type="checkbox" class="method-checkbox" data-filter="PUT">
+                                <span>PUT</span>
+                            </div>
+                            <div class="method-filter-item" data-filter="DELETE">
+                                <input type="checkbox" class="method-checkbox" data-filter="DELETE">
+                                <span>DELETE</span>
+                            </div>
+                            <div class="method-filter-item" data-filter="PATCH">
+                                <input type="checkbox" class="method-checkbox" data-filter="PATCH">
+                                <span>PATCH</span>
+                            </div>
+                            <div class="method-filter-item" data-filter="HEAD">
+                                <input type="checkbox" class="method-checkbox" data-filter="HEAD">
+                                <span>HEAD</span>
+                            </div>
+                            <div class="method-filter-item" data-filter="OPTIONS">
+                                <input type="checkbox" class="method-checkbox" data-filter="OPTIONS">
+                                <span>OPTIONS</span>
+                            </div>
+                            <div class="method-filter-item" data-filter="TRACE">
+                                <input type="checkbox" class="method-checkbox" data-filter="TRACE">
+                                <span>TRACE</span>
+                            </div>
+                            <div class="method-filter-divider"></div>
                             <div class="method-filter-item" data-filter="XHR"
-                                title="Show only XHR/Fetch requests (exclude images, fonts, text files)">XHR/Fetch</div>
+                                title="Show only XHR/Fetch requests (exclude images, fonts, text files)">
+                                <input type="checkbox" class="method-checkbox" data-filter="XHR">
+                                <span>XHR/Fetch</span>
+                            </div>
                         </div>
                     </div>
                     <button id="color-filter-btn" class="filter-btn" title="Filter by Color">
